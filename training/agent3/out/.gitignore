@@ -1,0 +1,3 @@
+# training outputs (checkpoints ~32 MB); the shipped artifact is ../../agent3_blueprint.npz
+*
+!.gitignore
