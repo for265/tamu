@@ -29,7 +29,9 @@ import uvicorn
 import numpy as np
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-import re
+
+import random
+from evaluator import omaha_score
 
 from evaluator import card_rank, card_suit, cards_to_str, omaha_score, warmup  # handy helpers, see evaluator.py
 from game import Action, AgentConfig, HandResult, Observation, Street
@@ -99,26 +101,83 @@ def choose_action(obs: Observation, memory: dict) -> Action:
     # Simple example of a heuristic bot, which just checks when it is of no cost, otherwise folds
     # Replace this with your strategy!
     #print(cards_to_str(obs.hole_cards))
-    print(cards_to_str(obs.board))
-    if len(obs.board) == 5:
-        print('hand ', cards_to_str(obs.hole_cards))
-        print('score ', omaha_score(obs.hole_cards, obs.board))
-    print(obs.hand_index)
-
+    #print(cards_to_str(obs.board))
+   # if len(obs.board) == 5:
+        #print('hand ', cards_to_str(obs.hole_cards))
+        #print('score ', omaha_score(obs.hole_cards, obs.board))
+    #print(obs.hand_index)
 
     hand = ""
 
     currenthand = cards_to_str(obs.hole_cards)
-    currenthand.replace(' ', '')
 
-    arr = np.array(['A', 'A', 'B', 'C', 'C', 'C', 'A', 'B'])
+    arr = currenthand.split(" ")
 
     values, counts = np.unique(arr, return_counts=True)
-    freq_table = dict(zip(values, counts))
+    totaltable = dict(zip(values, counts))
 
-    print(freq_table)
+    values = np.array([card[0] for card in totaltable])
+    suits = np.array([card[1] for card in totaltable])
 
-    print(hand)
+   # print("Values:", values)
+   # print("Suits: ", suits)
+
+    vaule_values, vaule_counts = np.unique(values, return_counts=True)
+    hand_vaule_freq_table =  dict(zip(vaule_values, vaule_counts))
+
+    suits_values, suits_counts = np.unique(suits, return_counts=True)
+    hand_suits_freq_table =  dict(zip(suits_values, suits_counts))
+
+    board_vaule_freq_table = {}
+    board_suits_freq_table = {}
+
+    #print('hand ',hand_vaule_freq_table)
+    #print('hand ',hand_suits_freq_table)
+
+    if len(obs.board) > 0:
+        currentboard = cards_to_str(obs.board)
+
+        arr = currentboard.split(" ")
+
+        values, counts = np.unique(arr, return_counts=True)
+        totaltable = dict(zip(values, counts))
+
+        values = np.array([card[0] for card in totaltable])
+        suits = np.array([card[1] for card in totaltable])
+
+        #print("Values:", values)
+        #print("Suits: ", suits)
+
+        vaule_values, vaule_counts = np.unique(values, return_counts=True)
+        board_vaule_freq_table = dict(zip(vaule_values, vaule_counts))
+
+        suits_values, suits_counts = np.unique(suits, return_counts=True)
+        board_suits_freq_table = dict(zip(suits_values, suits_counts))
+
+        #print('board ',board_vaule_freq_table)
+        #print('board ',board_suits_freq_table)
+
+    for suit in ['s', 'h', 'c', 'd']:
+        h_count = hand_suits_freq_table.get(suit, 0)
+        b_count = board_suits_freq_table.get(suit, 0)
+
+        if h_count >= 2 and b_count >= 3:
+            hand = "Flush"
+            break
+
+    for val in ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6']:
+        h_count = hand_vaule_freq_table.get(val, 0)
+        b_count = board_vaule_freq_table.get(val, 0)
+
+        legal_count = min(h_count, 2) + min(b_count, 3)
+        if legal_count == 4:
+            hand = "Four Of a Kind"
+            break
+
+    #print(hand)
+    if (hand == "Four Of a Kind") & (obs.legal_actions.__contains__(Action.RAISE_POT)):
+       return Action.RAISE_POT
+
     if (hand == "Flush") & (obs.legal_actions.__contains__(Action.RAISE_POT)):
        return Action.RAISE_POT
 
@@ -141,6 +200,33 @@ def on_hand_end(result: HandResult, memory: dict) -> None:
     """
 
     memory["hands_played"] += 1
+
+
+
+def evaluate_hand_strength(hole_cards, current_board, iterations=100):
+    """
+    Evaluates current hand strength or draw potential by simulating the rest of the board.
+    """
+    if len(current_board) == 5:
+        # We are on the River; get the exact score
+        return omaha_score(hole_cards, current_board)
+
+    # The docstring notes cards are ints 0-35 (Short Deck)
+    known_cards = set(hole_cards + current_board)
+    deck = [c for c in range(36) if c not in known_cards]
+
+    cards_needed = 5 - len(current_board)
+    scores = []
+
+    for _ in range(iterations):
+        # Randomly deal the missing board cards
+        simulated_board = list(current_board) + random.sample(deck, cards_needed)
+        # Score the simulated 5-card river
+        scores.append(omaha_score(hole_cards, simulated_board))
+
+    # Return the average expected score (you can also return max(scores) to check for nut draws)
+    return sum(scores) / len(scores)
+
 
 # ===== END OF YOUR CODE =====
 
