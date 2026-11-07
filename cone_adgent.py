@@ -157,6 +157,10 @@ def choose_action(obs: Observation, memory: dict) -> Action:
         #print('board ',board_vaule_freq_table)
         #print('board ',board_suits_freq_table)
 
+
+    score = evaluate_hand_strength(obs.hole_cards,obs.board)
+    print(score)
+
     for suit in ['s', 'h', 'c', 'd']:
         h_count = hand_suits_freq_table.get(suit, 0)
         b_count = board_suits_freq_table.get(suit, 0)
@@ -175,11 +179,13 @@ def choose_action(obs: Observation, memory: dict) -> Action:
             break
 
     #print(hand)
-    if (hand == "Four Of a Kind") & (obs.legal_actions.__contains__(Action.RAISE_POT)):
-       return Action.RAISE_POT
+    if (hand == "Four Of a Kind") & (obs.legal_actions.__contains__(Action.RAISE_HALF)):
+       return Action.RAISE_HALF
 
     if (hand == "Flush") & (obs.legal_actions.__contains__(Action.RAISE_POT)):
        return Action.RAISE_POT
+    if (score >= 5722112) & (obs.legal_actions.__contains__(Action.RAISE_POT)):
+        return Action.RAISE_POT
 
 
     if obs.legal_actions.__contains__(Action.CHECK_CALL):
