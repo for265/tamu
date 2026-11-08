@@ -178,7 +178,7 @@ def choose_action(obs: Observation, memory: dict) -> Action:
             hand = "Four Of a Kind"
             break
 
-    #print(hand)
+
     if (hand == "Four Of a Kind") & (obs.legal_actions.__contains__(Action.RAISE_HALF)):
        return Action.RAISE_HALF
 
